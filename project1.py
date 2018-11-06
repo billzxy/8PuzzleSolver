@@ -26,21 +26,23 @@ OPPOSITE_MOVES={"L":"R","R":"L","U":"D","D":"U","":""} # this is used for prunin
 
 
 class State:
-    def __init__(self, statels, path, g, last, lstate, goal):
+    def __init__(self, statels, g, last, lstate, goal):
         # no private members for simplicity
         self.state = statels    # stored as a list
         self.lastMove = last    # last move, e.g., "U", used to prune a returning move
-        self.lastState = lstate
-        self.path = path
-        self.path.append(self.lastMove)
-        self.g = g
+        self.lastState = lstate # reference to the last state
+        self.g = g              # cost to get here
         self.heuristic = 0      # heuristic value of the current state
-        self.f = 0
+        self.f = 0              # utility function value
         self.nextstates = []    # the collection of next states, heuristic value is the key, ref. to the State is value
         self.goalState = goal   # reference to goal state object
-        self.calcHeuristic()
+        self.calcHeuristic()    # automatically calculate heuristic and f after instanciated
 
     def genNextStates(self):
+        """
+        This method generates the next states and put into a list
+        :return:
+        """
         posZero = self.state.index(0)
         for d in DIRECTIONS[posZero]:
             if OPPOSITE_MOVES[self.lastMove] == DIRECTIONS[posZero][d]:  # prune the returning move
@@ -48,10 +50,14 @@ class State:
             next = deepcopy(self.state)
             next[posZero], next[d] = next[d], next[posZero]  # swap the item in the list to make a move
 
-            nextState = State(next, self.path, self.g+1, DIRECTIONS[posZero][d], self, self.goalState)
+            nextState = State(next, self.g+1, DIRECTIONS[posZero][d], self, self.goalState)
             self.nextstates.append(nextState)
 
     def calcHeuristic(self):
+        """
+        this method calculates the heuristic value and update utility f
+        :return:
+        """
         if self.goalState is None or self.state == self.goalState.state:
             return
         goalList = self.goalState.state
@@ -64,9 +70,19 @@ class State:
         self.f= self.heuristic+self.g
 
     def __lt__(self, other):
+        """
+        overloading less than to enable sorting on utility f
+        :param other:
+        :return:
+        """
         return (self.f < other.f)
 
     def __eq__(self, other):
+        """
+        overloading equal comparison in order to compare states
+        :param other:
+        :return:
+        """
         if isinstance(other, State):
             return self.state == other.state
         return False
@@ -77,16 +93,20 @@ class State:
 
 class Puzzle:
     def __init__(self, initState, goalState):
-        self.goalstate = State(goalState,[],0, "", None, None)
-        self.initstate = State(initState,[],0, "", None,self.goalstate)
+        self.goalstate = State(goalState,0, "", None, None)
+        self.initstate = State(initState,0, "", None,self.goalstate)
         self.currstate = self.initstate
-        self.queue = [self.currstate]
-        self.goalpath = []
-        self.seen=[self.currstate.state]
+        self.queue = [self.currstate]   # this is the queue for visiting the next smallest utility f
+        self.goalpath = []              # this is a list for storing the goal path
+        self.visited=[self.currstate.state]    # this is a list to keep track of visited states
         self.depth = 0
         self.treesize = 1
 
     def solvePuzzle(self):
+        """
+        this function will go through the queue to find the goal path
+        :return:
+        """
         while self.queue:
             self.queue.sort(key=lambda state: state.f)
             self.currstate = self.queue.pop(0)
@@ -98,11 +118,16 @@ class Puzzle:
             self.currstate.genNextStates()
             self.treesize += len(self.currstate.nextstates)
             for next in self.currstate.nextstates:
-                if next.state not in self.seen:
+                if next.state not in self.visited:
                     self.queue.append(next)
-                    self.seen.append(next.state)
+                    self.visited.append(next.state)
 
     def getGoalPath(self, state):
+        """
+        when the goal state is reached, this function traces back the states to generate the goal path
+        :param state:
+        :return:
+        """
         curr = state
         path = []
         while curr!=self.initstate:
@@ -110,21 +135,11 @@ class Puzzle:
             curr = curr.lastState
         return path
 
-
-        """
-        if(self.currstate==self.goalstate):
-            return
-        self.currstate.genNextStates()
-        self.treesize += len(self.currstate.nextstates)
-        next = self.currstate.makeDecision()
-        self.goalpath.append(next.lastMove)
-        self.currstate = next
-        self.currcost += 1
-        self.solvePuzzle()
-        """
-
-
     def getResult(self):
+        """
+        this is for writing and printing; it generates a string that conforms to the format
+        :return:
+        """
         result = str(self.depth)+"\n"+str(self.treesize)+"\n"
         for s in self.goalpath:
             result += s+" "
@@ -136,14 +151,15 @@ def main():
     outname = sys.argv[2]
     initState=[]
     goalState=[]
+
     try:
-        file = open(fname,"r")
+        file = open(fname,"r")                    # file handling
     except IOError:
         print("File does not exist, or could not open file.")
         sys.exit()
 
     outf = open(outname,"w")
-    with file:
+    with file:                                  # reads through the input file and takes whats useful
         for i in range(0,3):
             line = file.readline()
             outf.write(line)
@@ -155,12 +171,17 @@ def main():
             outf.write(line)
             for s in line.rstrip().split(" "):
                 goalState.append(int(s))
-    puzzle = Puzzle(initState,goalState)
+
+    puzzle = Puzzle(initState,goalState)        # initializes the puzzle object and solves puzzle, then presents
     puzzle.solvePuzzle()
     outf.write("\n\n"+puzzle.getResult())
     outf.close()
 
 def test():
+    """
+    for testing purpose
+    :return:
+    """
     puzzle = Puzzle([2,8,3,1,6,4,7,0,5], [1,2,3,8,0,4,7,6,5])
     puzzle.solvePuzzle()
     print("\n\n" + puzzle.getResult())
