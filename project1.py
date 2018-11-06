@@ -26,11 +26,16 @@ OPPOSITE_MOVES={"L":"R","R":"L","U":"D","D":"U","":""} # this is used for prunin
 
 
 class State:
-    def __init__(self, statels, last, goal):
+    def __init__(self, statels, path, g, last, lstate, goal):
         # no private members for simplicity
         self.state = statels    # stored as a list
         self.lastMove = last    # last move, e.g., "U", used to prune a returning move
+        self.lastState = lstate
+        self.path = path
+        self.path.append(self.lastMove)
+        self.g = g
         self.heuristic = 0      # heuristic value of the current state
+        self.f = 0
         self.nextstates = []    # the collection of next states, heuristic value is the key, ref. to the State is value
         self.goalState = goal   # reference to goal state object
         self.calcHeuristic()
@@ -43,8 +48,8 @@ class State:
             next = deepcopy(self.state)
             next[posZero], next[d] = next[d], next[posZero]  # swap the item in the list to make a move
 
-            nextState = State(next, DIRECTIONS[posZero][d], self.goalState)
-            self.nextstates.append([nextState.heuristic, nextState])
+            nextState = State(next, self.path, self.g+1, DIRECTIONS[posZero][d], self, self.goalState)
+            self.nextstates.append(nextState)
 
     def calcHeuristic(self):
         if self.goalState is None or self.state == self.goalState.state:
@@ -56,12 +61,10 @@ class State:
                 if(self.state[s]==goalList[g]):
                     totalManDist += MAN_DISTANCES[s][g]
         self.heuristic = totalManDist
-
-    def makeDecision(self):
-        return min(self.nextstates)[1]  # make the decision of which path to go down based on heuristics
+        self.f= self.heuristic+self.g
 
     def __lt__(self, other):
-        return (self.heuristic < other.heuristic)
+        return (self.f < other.f)
 
     def __eq__(self, other):
         if isinstance(other, State):
@@ -74,14 +77,41 @@ class State:
 
 class Puzzle:
     def __init__(self, initState, goalState):
-        self.goalstate = State(goalState, "", None)
-        self.initstate = State(initState, "", self.goalstate)
+        self.goalstate = State(goalState,[],0, "", None, None)
+        self.initstate = State(initState,[],0, "", None,self.goalstate)
         self.currstate = self.initstate
+        self.queue = [self.currstate]
         self.goalpath = []
-        self.currcost = 0
+        self.seen=[self.currstate.state]
+        self.depth = 0
         self.treesize = 1
 
     def solvePuzzle(self):
+        while self.queue:
+            self.queue.sort(key=lambda state: state.f)
+            self.currstate = self.queue.pop(0)
+            if(self.currstate.g>self.depth):
+                self.depth = self.currstate.g
+            if (self.currstate == self.goalstate):
+                self.goalpath = self.getGoalPath(self.currstate)
+                return
+            self.currstate.genNextStates()
+            self.treesize += len(self.currstate.nextstates)
+            for next in self.currstate.nextstates:
+                if next.state not in self.seen:
+                    self.queue.append(next)
+                    self.seen.append(next.state)
+
+    def getGoalPath(self, state):
+        curr = state
+        path = []
+        while curr!=self.initstate:
+            path.insert(0,curr.lastMove)
+            curr = curr.lastState
+        return path
+
+
+        """
         if(self.currstate==self.goalstate):
             return
         self.currstate.genNextStates()
@@ -91,9 +121,11 @@ class Puzzle:
         self.currstate = next
         self.currcost += 1
         self.solvePuzzle()
+        """
+
 
     def getResult(self):
-        result = str(self.currcost)+"\n"+str(self.treesize)+"\n"
+        result = str(self.depth)+"\n"+str(self.treesize)+"\n"
         for s in self.goalpath:
             result += s+" "
         return result
@@ -126,9 +158,25 @@ def main():
     puzzle = Puzzle(initState,goalState)
     puzzle.solvePuzzle()
     outf.write("\n\n"+puzzle.getResult())
-
     outf.close()
+
+def test():
+    puzzle = Puzzle([2,8,3,1,6,4,7,0,5], [1,2,3,8,0,4,7,6,5])
+    puzzle.solvePuzzle()
+    print("\n\n" + puzzle.getResult())
+    puzzle = Puzzle([2,8,3,7,1,6,0,5,4], [1,2,3,8,0,4,7,6,5])
+    puzzle.solvePuzzle()
+    print("\n\n" + puzzle.getResult())
+    puzzle = Puzzle([1,0,6,4,2,3,7,5,8], [7,4,3,5,0,6,2,8,1])
+    puzzle.solvePuzzle()
+    print("\n\n" + puzzle.getResult())
+    puzzle = Puzzle([8,1,2,3,6,4,5,0,7], [4,2,1,8,7,0,3,5,6])
+    puzzle.solvePuzzle()
+    print("\n\n" + puzzle.getResult())
+
+
 main()
+#test()
 
 
     
